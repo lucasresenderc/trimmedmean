@@ -6,7 +6,8 @@ import seaborn as sns
 import pandas as pd 
 
 # output directory
-OUT_DIR = pathlib.Path("personal/trimmed_mean/plots")
+OUT_DIR = pathlib.Path("plots")
+OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # number of jobs
 n_jobs = 200

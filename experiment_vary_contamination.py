@@ -3,7 +3,8 @@ import numpy as np
 import robust_utils as ru
 
 # output directory
-OUT_DIR = pathlib.Path("personal/trimmed_mean/results")
+OUT_DIR = pathlib.Path("results")
+OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # number of jobs
 n_jobs = 200

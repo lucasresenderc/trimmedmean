@@ -1,2 +1,3 @@
 *.pdf
 *.json
+__pycache__

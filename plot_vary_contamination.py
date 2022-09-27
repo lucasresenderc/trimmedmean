@@ -3,8 +3,9 @@ import numpy as np
 import robust_utils as ru
 
 # output directory
-OUT_DIR = pathlib.Path("personal/trimmed_mean/plots")
-DATA_DIR = pathlib.Path("personal/trimmed_mean/results")
+OUT_DIR = pathlib.Path("plots")
+OUT_DIR.mkdir(parents=True, exist_ok=True)
+DATA_DIR = pathlib.Path("results")
 
 # dimension of the feature space
 d = 20
