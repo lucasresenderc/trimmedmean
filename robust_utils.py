@@ -12,7 +12,8 @@ import time
 
     FIT FUNCTIONS
 
-    sort_blocks: define new blocks at random for MOM
+    MOMBlockGenerator: class that controls the generation of blocks for MOM
+    MOMBlockGenerator::sort_blocks: define new blocks at random for MOM
     get_active_indexes: discover the active indexes at a point
         if method == "MOM" it will generate a random partition
         of [n] with k sets and return the set realizing the
