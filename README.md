@@ -9,11 +9,11 @@ This repository has 6 main scripts:
 
 - **experiment_gd_plugin.py:** realizes an experiment comparing the gradient descent method with the plug-in method for the linear regression with quadratic error. It generates two plots, both saved on <code>/plots</code>, one with information about the computational time between methods and another with their performance;
 
-- **experiment_vary_contamination:** realizes an experiment with every variable fixed but the contamination. Its outputs are saved as <code>.json</code> files on <code>/results</code>;
+- **experiment_vary_contamination.py:** realizes an experiment with every variable fixed but the contamination. Its outputs are saved as <code>.json</code> files on <code>/results</code>;
 
 - **plot_vary_contamination.py:** reads the output files of the last script and generate a plot saved on <code>/plots</code>. The name of the file will correspond to the arguments used on the script;
 
-- **exoeriment_vary_sample_size and plot_vary_sample_size:** those files are analogous to the former two.
+- **exoeriment_vary_sample_size.py and plot_vary_sample_size.py:** those files are analogous to the former two.
 
 ## What if I want to use it to fit some data of my own?
 
