@@ -38,7 +38,7 @@ beta_hat = ru.fit_by_gd(X, Y, beta_m, beta_M, k, method="TM", block_generator = 
 
 ## How to generate the same results as in the article?
 
-Just change the parameter <code>n_jobs</code> on the experiment scripts to adapt for our machine and run the following:
+Just change the parameter <code>n_jobs</code> on the experiment scripts to fit your machine specs and run the following:
 <pre>
 python experiment_gd_plugin.py
 python experiment_vary_contamination.py
