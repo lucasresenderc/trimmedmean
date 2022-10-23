@@ -351,13 +351,13 @@ def plot_combination_with_gaussian_data(
 
         dfs.append(pd.DataFrame({
             "Method": sum([[m for i in range(len(ERM_errors))] for m in methods], []),
-            r"$\left|\left| \hat{\beta}_n - \beta^* \right|\right|_{L^2}$": distances,
+            r"$\left\| \hat{\beta}_n - \beta^* \right\|_{L^2}$": distances,
             x_label: [x_value for i in range(len(ERM_errors)*len(methods))],
         }))
 
     df = pd.concat(dfs)
     sns.set(rc={'figure.figsize':(5,4)})
-    g = sns.boxplot(x=x_label, y=r"$\left|\left| \hat{\beta}_n - \beta^* \right|\right|_{L^2}$", hue="Method", data=df, linewidth=.1)
+    g = sns.boxplot(x=x_label, y=r"$\left\| \hat{\beta}_n - \beta^* \right\|_{L^2}$", hue="Method", data=df, linewidth=.1)
     g.set_yscale("log")
     if quantities[0] > 0:
         filename = f"{experiment_name}-{experiment_invariant}-gaussian-error-{d}-{correlation_rate}-{student_degrees}.pdf"
