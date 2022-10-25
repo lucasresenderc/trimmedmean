@@ -16,32 +16,42 @@ for n in [5*d, 10*d, 20*d]:
     
     # with normal error
     quantities_list = [[n - n_contaminated, 0, n_contaminated, 0, 0] for n_contaminated in n_contaminated_list]
-    ru.plot_combination_with_gaussian_data(
+    ru.plot_combination(
         DATA_DIR,
         OUT_DIR,
         d,
-        quantities_list,
         [q/n for q in n_contaminated_list],
         r"$\varepsilon$",
-        "vary_contamination",
-        f"n={n}",
-        correlation_rate = 0,
-        student_degrees = 4.0
+        f"vary_contamination_LL_gaussian_error_n={n}",
+        [
+            {
+                "type": "LerasleLecue",
+                "quantities": quantities,
+                "student_degrees": 4.0,
+                "correlation_rate" : 0.0
+            }
+            for quantities in quantities_list
+        ]
     )
 
     # with student error
     quantities_list = [[0, 0, n_contaminated, 0, n - n_contaminated] for n_contaminated in n_contaminated_list]
     for correlation_rate in [0, .5]:
         for student_degrees in [1.0, 2.0, 4.0]:
-            ru.plot_combination_with_gaussian_data(
+            ru.plot_combination(
                 DATA_DIR,
                 OUT_DIR,
                 d,
-                quantities_list,
                 [q/n for q in n_contaminated_list],
                 r"$\varepsilon$",
-                "vary_contamination",
-                f"n={n}",
-                correlation_rate = correlation_rate,
-                student_degrees = student_degrees
+                f"vary_contamination_LL_students_sd={student_degrees}_cr={correlation_rate}_n={n}",
+                [
+                    {
+                        "type": "LerasleLecue",
+                        "quantities": quantities,
+                        "student_degrees": student_degrees,
+                        "correlation_rate" : correlation_rate
+                    }
+                    for quantities in quantities_list
+                ]
             )

@@ -169,27 +169,52 @@ def fit_by_plugin(
 def generate_dataset(
     rng : np.random._generator.Generator,
     beta : np.ndarray,
-    quantities : list = [200, 10, 10, 10, 10],
-    student_degrees : float = 4.0,
-    correlation_rate : float = .5
+    data_parameters : dict = {
+        "type": "LerasleLecue",
+        "quantities": [200, 10, 10, 10, 10],
+        "student_degrees": 4.0,
+        "correlation_rate" : 0.5
+    },
 ):
-    n = np.sum(quantities)
-    ns = np.cumsum(quantities)
-    d = beta.size
+    if data_parameters["type"] == "LerasleLecue":
+        quantities = data_parameters["quantities"]
+        student_degrees = data_parameters["student_degrees"]
+        correlation_rate = data_parameters["correlation_rate"]
 
-    X = np.zeros(shape=(n,d))
-    X[:ns[0], :] = rng.normal(size=(quantities[0],d))
-    X[ns[0]:ns[2], :] += 1
-    X[ns[2]:ns[3], :] = rng.uniform(size=(quantities[3],d))
-    cov = np.power( correlation_rate, np.abs( np.array([range(d),]*d) - np.array([range(d),]*d).T ) )
-    X[ns[3]:, :] = rng.multivariate_normal(np.zeros(d), cov, size=quantities[4])
+        n = np.sum(quantities)
+        ns = np.cumsum(quantities)
+        d = beta.size
 
-    Y = np.zeros(n)
-    Y[:ns[0]] =  X[:ns[0], :] @ beta + rng.normal(size=quantities[0])
-    Y[ns[0]:ns[1]] += 1
-    Y[ns[1]:ns[2]] += 10000
-    Y[ns[2]:ns[3]] = 1.*(rng.uniform(size=quantities[3]) > .5)
-    Y[ns[3]:] =  X[ns[3]:, :] @ beta + rng.standard_t(student_degrees, size=quantities[4])
+        X = np.zeros(shape=(n,d))
+        X[:ns[0], :] = rng.normal(size=(quantities[0],d))
+        X[ns[0]:ns[2], :] += 1
+        X[ns[2]:ns[3], :] = rng.uniform(size=(quantities[3],d))
+        cov = np.power( correlation_rate, np.abs( np.array([range(d),]*d) - np.array([range(d),]*d).T ) )
+        X[ns[3]:, :] = rng.multivariate_normal(np.zeros(d), cov, size=quantities[4])
+
+        Y = np.zeros(n)
+        Y[:ns[0]] =  X[:ns[0], :] @ beta + rng.normal(size=quantities[0])
+        Y[ns[0]:ns[1]] += 1
+        Y[ns[1]:ns[2]] += 10000
+        Y[ns[2]:ns[3]] = 1.*(rng.uniform(size=quantities[3]) > .5)
+        Y[ns[3]:] =  X[ns[3]:, :] @ beta + rng.standard_t(student_degrees, size=quantities[4])
+    
+    elif data_parameters["type"] == "BernoulliNormal":
+        n = data_parameters["sample_size"]
+        nc = data_parameters["sample_contaminated"]
+        p = data_parameters["p"]
+        d = beta.size
+        
+        # generate zero entries with bernoulli
+        n_entries_to_zero = n - rng.binomial(n, p)
+        # add more zeros with corruption
+        n_entries_to_zero += nc
+        if n_entries_to_zero > n:
+            n_entries_to_zero = n
+
+        X = rng.normal(size=(n,d)) / np.sqrt(p)
+        X[:n_entries_to_zero, :] *= 0
+        Y = X @ beta + rng.normal(size = n)
 
     return X, Y
 
@@ -203,15 +228,18 @@ def run_single_trial(
     rng: np.random._generator.Generator,
     beta : np.ndarray,
     k : int,
-    quantities : list = [200, 10, 10, 10, 10],
+    data_parameters : dict = {
+        "type": "LerasleLecue",
+        "quantities": [200, 10, 10, 10, 10],
+        "student_degrees": 4.0,
+        "correlation_rate" : 0.5
+    },
     method : str = "TM",
     block_kind : str = "fixed",
-    student_degrees : float = 4.0,
-    correlation_rate : float = .5,
     algorithm : str = "gd",
     return_time : bool = False,
 ):
-    X,Y = generate_dataset(rng, beta, quantities=quantities, student_degrees=student_degrees, correlation_rate=correlation_rate)
+    X,Y = generate_dataset(rng, beta, data_parameters=data_parameters)
     beta_m = rng.uniform(size=beta.size)
     beta_M = rng.uniform(size=beta.size)
     t = time.time()
@@ -220,7 +248,7 @@ def run_single_trial(
     else:
         block_generator = None
         if method == "MOM":
-            block_generator = MOMBlockGenerator(block_kind, rng, np.sum(quantities), k)
+            block_generator = MOMBlockGenerator(block_kind, rng, len(Y), k)
         if algorithm == "gd":
             beta_hat = fit_by_gd(X, Y, beta_m, beta_M, k, method=method, block_generator = block_generator, max_iter=1000)
         else:
@@ -234,11 +262,14 @@ def run_single_trial(
 def run_trials(
     beta : np.ndarray,
     k : int,
-    quantities : list = [200, 10, 10, 10, 10],
+    data_parameters : dict = {
+        "type": "LerasleLecue",
+        "quantities": [200, 10, 10, 10, 10],
+        "student_degrees": 4.0,
+        "correlation_rate" : 0.5
+    },
     method : str = "TM",
     block_kind : str = "fixed",
-    student_degrees : float = 4.0,
-    correlation_rate : float = .5,
     algorithm : str = "gd",
     return_time : bool = False,
     n_trials : int = 70,
@@ -258,11 +289,9 @@ def run_trials(
                 rngs,
                 repeat(beta),
                 repeat(k),
-                repeat(quantities),
+                repeat(data_parameters),
                 repeat(method),
                 repeat(block_kind),
-                repeat(student_degrees),
-                repeat(correlation_rate),
                 repeat(algorithm),
                 repeat(return_time)
             )
@@ -276,32 +305,47 @@ def divisors(n):
             divs += [i,n//i]
     return list(set(divs))
 
-def get_file_name_prefix(d, quantities, correlation_rate = 0, student_degrees = 4.0, algorithm : str = "gd"):
-    return f"{d}-{'-'.join([str(q) for q in quantities])}-{correlation_rate}-{student_degrees}-{algorithm}"
+def get_file_name_prefix(d, data_parameters, algorithm : str = "gd"):
+    data_string = ""
+    for key in data_parameters:
+        data_string += key
+        if type(data_parameters[key]) == list:
+            data_string += "-"+ "-".join([str(a) for a in data_parameters[key]])
+        else:
+            data_string += "-"+str(data_parameters[key])
+    return f"{d}-{data_string}-{algorithm}"
 
 def L2_error_gaussian(beta, beta_hat, correlation_rate = 0):
     d = beta.size
     cov = np.power( correlation_rate, np.abs( np.array([range(d),]*d) - np.array([range(d),]*d).T ) )
     return np.sqrt(np.dot( beta - beta_hat, cov @ (beta - beta_hat) ))
 
-def run_combination_with_gaussian_data(
+def run_combination(
     OUT_DIR,
     beta,
-    quantities,
     k,
     MOM_Ks,
-    correlation_rate : float = 0,
-    student_degrees : float = 4.0,
+    data_parameters : dict = {
+        "type": "LerasleLecue",
+        "quantities": [200, 10, 10, 10, 10],
+        "student_degrees": 4.0,
+        "correlation_rate" : 0.5
+    },
     algorithm : str = "gd",
     n_trials : int = 70,
     n_jobs : int = 1
 ):
-    filename = get_file_name_prefix(beta.size, quantities, correlation_rate = correlation_rate, student_degrees = student_degrees, algorithm = algorithm) + ".json"
+    if data_parameters["type"] == "BernoulliNormal":
+        correlation_rate = 0
+    else:
+        correlation_rate = data_parameters["correlation_rate"]
+    
+    filename = get_file_name_prefix(beta.size, data_parameters, algorithm = algorithm) + ".json"
     if not (OUT_DIR / filename).is_file():
         
-        ERM_errors = [L2_error_gaussian(beta, beta_hat, correlation_rate = correlation_rate) for beta_hat in run_trials(beta, k, quantities=quantities, method="ERM", n_trials=n_jobs, n_jobs=n_jobs, correlation_rate = correlation_rate, student_degrees = student_degrees, algorithm = algorithm)]
-        TM_errors = [L2_error_gaussian(beta, beta_hat, correlation_rate = correlation_rate) for beta_hat in run_trials(beta, k, quantities=quantities, method="TM", n_trials=n_jobs, n_jobs=n_jobs, correlation_rate = correlation_rate, student_degrees = student_degrees, algorithm = algorithm)]
-        MOM_errors = [[L2_error_gaussian(beta, beta_hat, correlation_rate = correlation_rate) for beta_hat in run_trials(beta, K, quantities=quantities, method="MOM", n_trials=n_jobs, n_jobs=n_jobs, correlation_rate = correlation_rate, student_degrees = student_degrees, algorithm = algorithm)] for K in MOM_Ks]
+        ERM_errors = [L2_error_gaussian(beta, beta_hat, correlation_rate = correlation_rate) for beta_hat in run_trials(beta, k, data_parameters=data_parameters, method="ERM", n_trials=n_jobs, n_jobs=n_jobs, algorithm = algorithm)]
+        TM_errors = [L2_error_gaussian(beta, beta_hat, correlation_rate = correlation_rate) for beta_hat in run_trials(beta, k, data_parameters=data_parameters, method="TM", n_trials=n_jobs, n_jobs=n_jobs, algorithm = algorithm)]
+        MOM_errors = [[L2_error_gaussian(beta, beta_hat, correlation_rate = correlation_rate) for beta_hat in run_trials(beta, K, data_parameters=data_parameters, method="MOM", n_trials=n_jobs, n_jobs=n_jobs, algorithm = algorithm)] for K in MOM_Ks]
 
         data = {
             "ERM_errors" : ERM_errors,
@@ -314,31 +358,26 @@ def run_combination_with_gaussian_data(
         json.dump(data, open(OUT_DIR / filename, 'w'))
     return filename
 
-def plot_combination_with_gaussian_data(
+def plot_combination(
     DATA_DIR,
     OUT_DIR,
     d,
-    quantities_list,
     x_values,
     x_label,
     experiment_name,
-    experiment_invariant,
-    correlation_rate : float = 0,
-    student_degrees : float = 4.0,
+    data_parameters_space,
     algorithm : str = "gd",
     methods : list = ["TM", "MOM", "ERM"],
 ):
     dfs = []
     methods.sort(reverse=True)
-    for quantities, x_value in zip(quantities_list, x_values):
-        filename = get_file_name_prefix(d, quantities, correlation_rate = correlation_rate, student_degrees = student_degrees, algorithm = algorithm) + ".json"
+    for data_parameters, x_value in zip(data_parameters_space, x_values):
+        filename = get_file_name_prefix(d, data_parameters, algorithm = algorithm) + ".json"
         data = json.load(open(DATA_DIR / filename, 'r'))
 
         ERM_errors = data["ERM_errors"]
         TM_errors = data["TM_errors"]
         MOM_errors = np.min(data["MOM_errors"], axis=0).tolist()
-
-        #print(quantities[2], np.mean([data["Ks"][i] for i in np.argmin(data["MOM_errors"], axis=0)]) )
 
         distances = []
         if "TM" in methods:
@@ -347,7 +386,6 @@ def plot_combination_with_gaussian_data(
             distances += MOM_errors
         if "ERM" in methods:
             distances += ERM_errors
-
 
         dfs.append(pd.DataFrame({
             "Method": sum([[m for i in range(len(ERM_errors))] for m in methods], []),
@@ -359,11 +397,8 @@ def plot_combination_with_gaussian_data(
     sns.set(rc={'figure.figsize':(5,4)})
     g = sns.boxplot(x=x_label, y=r"$\left\| \hat{\beta}_n - \beta^* \right\|_{L^2}$", hue="Method", data=df, linewidth=.1)
     g.set_yscale("log")
-    if quantities[0] > 0:
-        filename = f"{experiment_name}-{experiment_invariant}-gaussian-error-{d}-{correlation_rate}-{student_degrees}.pdf"
-    else:
-        filename = f"{experiment_name}-{experiment_invariant}-student-error-{d}-{correlation_rate}-{student_degrees}.pdf"
-    sns.move_legend(g, "lower center", bbox_to_anchor=(.5, 1), ncol=3, title=None, frameon=False)
+    filename = f"{experiment_name}.pdf"
+    #sns.move_legend(g, "lower center", bbox_to_anchor=(.5, 1), ncol=3, title=None, frameon=False)
     plt.xticks(rotation = 90)
     plt.yticks(rotation = 90)
     plt.tight_layout()

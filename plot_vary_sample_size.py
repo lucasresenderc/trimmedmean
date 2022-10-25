@@ -18,17 +18,22 @@ for eps in [.05, .2]:
 
     # with normal error
     quantities_list = [[n - int(n*eps), 0, int(n*eps), 0, 0] for n in n_range]
-    ru.plot_combination_with_gaussian_data(
+    ru.plot_combination(
         DATA_DIR,
         OUT_DIR,
         d,
-        quantities_list,
         n_range,
         r"$n$",
-        "vary_sample_size",
-        f"eps={eps}",
-        correlation_rate = 0,
-        student_degrees = 4.0,
+        f"vary_sample_size_LL_gaussian_error_eps={eps}",
+        [
+            {
+                "type": "LerasleLecue",
+                "quantities": quantities,
+                "student_degrees": 4.0,
+                "correlation_rate" : 0.0
+            }
+            for quantities in quantities_list
+        ],
         methods=["TM", "MOM"]
     )
     
@@ -36,16 +41,21 @@ for eps in [.05, .2]:
     quantities_list = [[0, 0, int(n*eps), 0, n - int(n*eps)] for n in n_range]
     for correlation_rate in [0, .5]:
         for student_degrees in [1.0, 2.0, 4.0]:
-            ru.plot_combination_with_gaussian_data(
+            ru.plot_combination(
                 DATA_DIR,
                 OUT_DIR,
                 d,
-                quantities_list,
                 n_range,
                 r"$n$",
-                "vary_sample_size",
-                f"eps={eps}",
-                correlation_rate = correlation_rate,
-                student_degrees = student_degrees,
+                f"vary_sample_size_LL_students_sd={student_degrees}_cr={correlation_rate}_eps={eps}",
+                [
+                    {
+                        "type": "LerasleLecue",
+                        "quantities": quantities,
+                        "student_degrees": student_degrees,
+                        "correlation_rate" : correlation_rate
+                    }
+                    for quantities in quantities_list
+                ],
                 methods=["TM", "MOM"]
             )

@@ -27,7 +27,12 @@ k = 2*n_contaminated + 5
 gd_trials = ru.run_trials(
     beta,
     k,
-    quantities = quantities,
+    data_parameters = {
+        "type": "LerasleLecue",
+        "quantities": quantities,
+        "student_degrees": 4.0,
+        "correlation_rate" : 0.0
+    },
     method = "TM",
     algorithm = "gd",
     n_trials = n_trials,
@@ -41,7 +46,12 @@ gd_times = [trial[1] for trial in gd_trials]
 plugin_trials = ru.run_trials(
     beta,
     k,
-    quantities = quantities,
+    data_parameters = {
+        "type": "LerasleLecue",
+        "quantities": quantities,
+        "student_degrees": 4.0,
+        "correlation_rate" : 0.0
+    },
     method = "TM",
     algorithm = "plugin",
     n_trials = n_trials,

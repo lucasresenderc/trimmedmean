@@ -31,18 +31,21 @@ for eps in [.05, .2]:
         k = 2*n_contaminated + 5
 
         # mom parameter family to vary
-        MOM_Ks = list(set([i for i in range(np.max([1,2*n_contaminated-10]),np.min([2*n_contaminated+10,n])+1,1)] + ru.divisors(n)))
+        MOM_Ks = [2*n_contaminated+1] #list(set([i for i in range(np.max([1,2*n_contaminated-10]),np.min([2*n_contaminated+10,n])+1,1)] + ru.divisors(n)))
 
         # with normal error
         quantities = [n - n_contaminated, 0, n_contaminated, 0, 0]
-        ru.run_combination_with_gaussian_data(
+        ru.run_combination(
             OUT_DIR,
             beta,
-            quantities,
             k,
             MOM_Ks,
-            correlation_rate = 0,
-            student_degrees = 4.0,
+            data_parameters = {
+                "type": "LerasleLecue",
+                "quantities": quantities,
+                "student_degrees": 4.0,
+                "correlation_rate" : 0.0
+            },
             n_trials=n_trials,
             n_jobs=n_jobs
         )       
@@ -51,14 +54,17 @@ for eps in [.05, .2]:
         quantities = [0, 0, n_contaminated, 0, n - n_contaminated]
         for correlation_rate in [0, .5]:
             for student_degrees in [1.0, 2.0, 4.0]:
-                ru.run_combination_with_gaussian_data(
+                ru.run_combination(
                     OUT_DIR,
                     beta,
-                    quantities,
                     k,
                     MOM_Ks,
-                    correlation_rate = correlation_rate,
-                    student_degrees = student_degrees,
+                    data_parameters = {
+                        "type": "LerasleLecue",
+                        "quantities": quantities,
+                        "student_degrees": student_degrees,
+                        "correlation_rate" : correlation_rate
+                    },
                     n_trials=n_trials,
                     n_jobs=n_jobs
                 )
