@@ -28,10 +28,10 @@ for eps in [.05, .2]:
         n_contaminated = int(eps*n)
 
         # trimmed mean parameter
-        k = 2*n_contaminated + 5
+        k = n_contaminated + 5
 
         # mom parameter family to vary
-        MOM_Ks = [2*n_contaminated+1] #list(set([i for i in range(np.max([1,2*n_contaminated-10]),np.min([2*n_contaminated+10,n])+1,1)] + ru.divisors(n)))
+        MOM_Ks = list(set([i for i in range(np.max([1,2*n_contaminated-10]),np.min([2*n_contaminated+10,n])+1,1)] + ru.divisors(n)))
 
         # with normal error
         quantities = [n - n_contaminated, 0, n_contaminated, 0, 0]
