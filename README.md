@@ -13,7 +13,9 @@ This repository has 6 main scripts:
 
 - **plot_vary_contamination.py:** reads the output files of the last script and generate a plot saved on <code>/plots</code>. The name of the file will correspond to the arguments used on the script;
 
-- **exoeriment_vary_sample_size.py and plot_vary_sample_size.py:** those files are analogous to the former two.
+- **experiment_vary_sample_size.py and plot_vary_sample_size.py:** those files are analogous to the former two;
+
+- **experiment_theta_zero.py:** experiment based on the Bernoulli-Normal distribution showing that the contamination level must be bounded by $\theta_0$.
 
 ## What if I want to use it to fit some data of my own?
 
