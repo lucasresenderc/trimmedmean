@@ -488,7 +488,7 @@ def plot_combination(
         if "ERM" in methods:
             distances += ERM_errors
 
-        correct_names = {"TM": "TM", "MOM": "MoM", "ERM": "OLS"}
+        correct_names = {"TM": "TM", "MOM": "Best-MoM", "ERM": "OLS"}
 
         dfs.append(
             pd.DataFrame(
@@ -519,5 +519,5 @@ def plot_combination(
     plt.xticks(rotation=45)
     plt.yticks(rotation=90)
     plt.tight_layout()
-    plt.savefig(OUT_DIR / filename)
+    plt.savefig(OUT_DIR / filename, pad_inches=0, bbox_inches='tight')
     plt.clf()
