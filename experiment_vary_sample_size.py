@@ -25,8 +25,8 @@ n_range = [60, 120, 180, 240, 360, 720]
 for n in n_range:
     print(f"Running n={n}")
 
-    # for the gaussian case we let eps = .4
-    eps = 0.4
+    # set contamination
+    eps = 0.2
     n_contaminated = int(eps * n)
 
     # trimmed mean parameter
@@ -64,28 +64,6 @@ for n in n_range:
             n_trials=n_trials,
             n_jobs=n_jobs,
         )
-
-    # for the student case we let eps = .2
-    eps = 0.2
-    n_contaminated = int(eps * n)
-
-    # trimmed mean parameter
-    k = n_contaminated + 5
-
-    # mom parameter family to vary
-    MOM_Ks = list(
-        set(
-            [
-                i
-                for i in range(
-                    np.max([1, 2 * n_contaminated - 10]),
-                    np.min([2 * n_contaminated + 10, n]) + 1,
-                    1,
-                )
-            ]
-            + ru.divisors(n)
-        )
-    )
 
     # with student error
     quantities = [0, 0, n_contaminated, 0, n - n_contaminated]

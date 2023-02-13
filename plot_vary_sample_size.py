@@ -14,9 +14,9 @@ d = 20
 n_range = [60, 120, 180, 240, 360, 720]
 
 # with normal error
-eps = 0.4
+eps = 0.2
 quantities_list = [[n - int(n * eps), 0, int(n * eps), 0, 0] for n in n_range]
-for correlation_rate in [0, 0.5]:
+for correlation_rate in [0]: #, 0.5]:
     ru.plot_combination(
         DATA_DIR,
         OUT_DIR,
