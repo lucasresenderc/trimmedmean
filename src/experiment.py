@@ -1,5 +1,6 @@
 
 import numpy as np
+import time
 from itertools import repeat
 from multiprocessing import Pool
 
@@ -21,13 +22,14 @@ def run_single_trial(
     fold_K = configs.DEFAULT_FOLD_K,
 ):
     X, Y = generate_dataset(rng, beta, data_parameters=data_parameters)
+    ts = time.time()
     beta_m = rng.uniform(size=beta.size)
     beta_M = rng.uniform(size=beta.size)
     if method == "OLS":
         beta_hat = fit_by_lstsq(X, Y)
-        return beta_hat, np.array([]), None
+        return beta_hat, np.array([]), None, time.time() - ts
     else:
-        return cross_validate(
+        beta_hat, params_losses, best_param = cross_validate(
             X,
             Y,
             beta_m,
@@ -41,6 +43,7 @@ def run_single_trial(
             selection_strategy = selection_strategy,
             fold_K = fold_K,
         )
+        return beta_hat, params_losses, best_param, time.time() - ts
 
 
 def run_trials(
@@ -74,7 +77,7 @@ def run_trials(
         )
 
         df = []
-        for i, (beta_hat, params_losses, best_param) in enumerate(results):
+        for i, (beta_hat, params_losses, best_param, time) in enumerate(results):
             df.append({
                 "seed": i + start_random_seed,
                 "method": method,
@@ -86,6 +89,7 @@ def run_trials(
                 "block_kind": block_kind,
                 "algorithm": algorithm,
                 "selection_strategy": selection_strategy,
-                "fold_K": fold_K
+                "fold_K": fold_K,
+                "time": time
             } | data_parameters)
         return df

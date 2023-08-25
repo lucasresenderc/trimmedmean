@@ -83,7 +83,7 @@ def cross_validate(
         best_param = params[np.argmin(params_losses)]
     elif selection_strategy == "max_slope":
         best_param = params[np.argmax(params_losses[:-1] / params_losses[1:]) + 1]
-        if params_losses[0] > params_losses[-1]:
+        if params_losses[0] < params_losses[-1]:
             best_param = params[0]
 
     # fit all data using the best param
