@@ -27,16 +27,21 @@ class MOMBlockGenerator:
         self.rng = rng
         self.n = n
         self.K = K
-        self.l = n // K
+        if self.K > self.n:
+            self.K = self.n
+        self.l = self.n // self.K
+
+        self.I = [[i + m*self.K for m in range(self.l)] for i in range(self.K)]
+        for i in range(self.n % self.K):
+            self.I[i].append(self.K * self.l + i)
+
         if kind == "fixed":
             self.B = self.sort_blocks()
 
     def sort_blocks(self):
         p = np.arange(self.n)
         self.rng.shuffle(p)
-        B = [p[m * self.l : m * self.l + self.l] for m in range(self.K)]
-        B[-1] = p[self.K * self.l - self.l :]
-        return B
+        return [p[i] for i in self.I]
 
     def get_blocks(self):
         if self.kind == "fixed":
@@ -102,9 +107,9 @@ def fit_by_gd(
     return beta_M
 
 
-def evaluate_cost(X, Y, loss, beta, k):
-    b = np.argsort(loss)[k:-k]
-    return np.mean(np.power(Y[b] - X[b, :] @ beta, 2))
+def evaluate_cost(loss, method, k, block_generator):
+    b = get_active_indexes(k, loss, np.zeros(loss.size), method, block_generator)
+    return np.mean(loss[b])
 
 
 def fit_by_plugin(
@@ -123,8 +128,8 @@ def fit_by_plugin(
     loss_m = np.power(Y - X @ beta_m, 2)
     loss_M = np.power(Y - X @ beta_M, 2)
 
-    cost_m = evaluate_cost(X, Y, loss_m, beta_m, k)
-    cost_M = evaluate_cost(X, Y, loss_M, beta_M, k)
+    cost_m = evaluate_cost(loss_m, method, k, block_generator)
+    cost_M = evaluate_cost(loss_M, method, k, block_generator)
     costs = [(cost_m, cost_M)]
     if cost_m < cost_M:
         beta_hat = np.copy(beta_m)
@@ -142,8 +147,8 @@ def fit_by_plugin(
         beta_M = np.linalg.lstsq(X[b, :], Y[b], rcond=None)[0]
         loss_M = np.power(Y - X @ beta_M, 2)
 
-        cost_m = evaluate_cost(X, Y, loss_m, beta_m, k)
-        cost_M = evaluate_cost(X, Y, loss_M, beta_M, k)
+        cost_m = evaluate_cost(loss_m, method, k, block_generator)
+        cost_M = evaluate_cost(loss_M, method, k, block_generator)
         if (cost_m, cost_M) in costs:
             break
         else:
