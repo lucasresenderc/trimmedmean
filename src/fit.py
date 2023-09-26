@@ -52,17 +52,17 @@ class MOMBlockGenerator:
 
 def fit_by_lstsq(X, Y):
     beta_hat = np.linalg.lstsq(X, Y, rcond=None)[0]
-    return beta_hat
+    cost = np.mean(np.power(Y - X @ beta_hat, 2))
+    return [[beta_hat, beta_hat]], [[cost, cost]]
 
 
-def get_active_indexes(k, loss_m, loss_M, method, block_generator):
-    diff = loss_m - loss_M
+def get_active_indexes(k, loss, method, block_generator):
     if method == "MOM":
         B = block_generator.get_blocks()
-        means = [np.mean(diff[b]) for b in B]
+        means = [np.mean(loss[b]) for b in B]
         return B[np.argsort(means)[len(means) // 2]]
     if method == "TM":
-        return np.argsort(diff)[k:-k]
+        return np.argsort(loss)[k:-k]
 
 
 def update_by_armijo(X, Y, b, beta, armijo_rate, eta):
@@ -75,41 +75,91 @@ def update_by_armijo(X, Y, b, beta, armijo_rate, eta):
     return beta + eta * direction, eta / armijo_rate
 
 
-def fit_by_gd(
+def fit_by_aasd(
     X,
     Y,
     beta_m,
     beta_M,
     k: int,
     armijo_rate: float = configs.DEFAULT_ARMIJO_RATE,
-    max_iter = configs.DEFAULT_GD_MAX_ITER,
-    method = configs.DEFAULT_METHOD,
+    max_iter: int = configs.DEFAULT_GD_MAX_ITER,
+    method: str = configs.DEFAULT_METHOD,
     block_generator = configs.DEFAULT_BLOCK_GENERATOR,
 ):
     if (method == "TM" and k == 0) or (method == "MOM" and k == 1):
         return fit_by_lstsq(X,Y)
 
-    loss_m = np.power(Y - X @ beta_m, 2)
-    loss_M = np.power(Y - X @ beta_M, 2)
-    b = get_active_indexes(k, loss_m, loss_M, method, block_generator)
-
     eta = 10
     gamma = 10
-    for i in range(1, max_iter):
+
+    loss_m = np.power(Y - X @ beta_m, 2)
+    loss_M = np.power(Y - X @ beta_M, 2)
+    b = get_active_indexes(k, loss_m - loss_M, method, block_generator)
+
+    beta_history = [[np.copy(beta_m), np.copy(beta_M)]]
+    cost_history = [[
+        np.mean(loss_m[get_active_indexes(k, loss_m, method, block_generator)]),
+        np.mean(loss_M[get_active_indexes(k, loss_M, method, block_generator)])
+    ]]
+    for _ in range(1, max_iter):
         beta_m, eta = update_by_armijo(X, Y, b, beta_m, armijo_rate, eta)
         loss_m = np.power(Y - X @ beta_m, 2)
-        b = get_active_indexes(k, loss_m, loss_M, method, block_generator)
+        b = get_active_indexes(k, loss_m - loss_M, method, block_generator)
 
         beta_M, gamma = update_by_armijo(X, Y, b, beta_M, armijo_rate, gamma)
         loss_M = np.power(Y - X @ beta_M, 2)
-        b = get_active_indexes(k, loss_m, loss_M, method, block_generator)
+        b = get_active_indexes(k, loss_m - loss_M, method, block_generator)
 
-    return beta_M
+        beta_history.append([np.copy(beta_m), np.copy(beta_M)])
+        cost_history.append([
+            np.mean(loss_m[get_active_indexes(k, loss_m, method, block_generator)]),
+            np.mean(loss_M[get_active_indexes(k, loss_M, method, block_generator)])
+        ])
 
+    return beta_history, cost_history 
+    
 
-def evaluate_cost(loss, method, k, block_generator):
-    b = get_active_indexes(k, loss, np.zeros(loss.size), method, block_generator)
-    return np.mean(loss[b])
+def fit_by_admm(
+    X,
+    Y,
+    beta_m,
+    beta_M,
+    k: int,
+    max_iter: int = configs.DEFAULT_GD_MAX_ITER,
+    method: str = configs.DEFAULT_METHOD,
+    block_generator = configs.DEFAULT_BLOCK_GENERATOR
+):
+    if (method == "TM" and k == 0) or (method == "MOM" and k == 1):
+        return fit_by_lstsq(X,Y)
+
+    d = beta_m.size
+    rho = 5.0
+    
+    loss_m = np.power(Y - X @ beta_m, 2)
+    loss_M = np.power(Y - X @ beta_M, 2)
+    b = get_active_indexes(k, loss_m - loss_M, method, block_generator)
+
+    beta_history = [[np.copy(beta_m), np.copy(beta_M)]]
+    cost_history = [[
+        np.mean(loss_m[get_active_indexes(k, loss_m, method, block_generator)]),
+        np.mean(loss_M[get_active_indexes(k, loss_M, method, block_generator)])
+    ]]
+    for _ in range(1, max_iter):
+        beta_m = np.linalg.solve((X[b, :].T)@X[b, :] + rho*np.identity(d), (X[b, :].T)@Y[b] + rho*beta_m)
+        loss_m = np.power(Y - X @ beta_m, 2)
+        b = get_active_indexes(k, loss_m - loss_M, method, block_generator)
+
+        beta_M = np.linalg.solve((X[b, :].T)@X[b, :] + rho*np.identity(d), (X[b, :].T)@Y[b] + rho*beta_M)
+        loss_M = np.power(Y - X @ beta_M, 2)
+        b = get_active_indexes(k, loss_m - loss_M, method, block_generator)
+
+        beta_history.append([np.copy(beta_m), np.copy(beta_M)])
+        cost_history.append([
+            np.mean(loss_m[get_active_indexes(k, loss_m, method, block_generator)]),
+            np.mean(loss_M[get_active_indexes(k, loss_M, method, block_generator)])
+        ])
+
+    return beta_history, cost_history 
 
 
 def fit_by_plugin(
@@ -127,38 +177,26 @@ def fit_by_plugin(
 
     loss_m = np.power(Y - X @ beta_m, 2)
     loss_M = np.power(Y - X @ beta_M, 2)
+    b = get_active_indexes(k, loss_m - loss_M, method, block_generator)
 
-    cost_m = evaluate_cost(loss_m, method, k, block_generator)
-    cost_M = evaluate_cost(loss_M, method, k, block_generator)
-    costs = [(cost_m, cost_M)]
-    if cost_m < cost_M:
-        beta_hat = np.copy(beta_m)
-        cost_hat = cost_m
-    else:
-        beta_hat = np.copy(beta_M)
-        cost_hat = cost_M
-
-    for i in range(max_iter):
-        b = get_active_indexes(k, loss_m, loss_M, method, block_generator)
+    beta_history = [[np.copy(beta_m), np.copy(beta_M)]]
+    cost_history = [[
+        np.mean(loss_m[get_active_indexes(k, loss_m, method, block_generator)]),
+        np.mean(loss_M[get_active_indexes(k, loss_M, method, block_generator)])
+    ]]
+    for _ in range(max_iter):
         beta_m = np.linalg.lstsq(X[b, :], Y[b], rcond=None)[0]
         loss_m = np.power(Y - X @ beta_m, 2)
-
-        b = get_active_indexes(k, loss_m, loss_M, method, block_generator)
+        b = get_active_indexes(k, loss_m - loss_M, method, block_generator)
+        
         beta_M = np.linalg.lstsq(X[b, :], Y[b], rcond=None)[0]
         loss_M = np.power(Y - X @ beta_M, 2)
+        b = get_active_indexes(k, loss_m - loss_M, method, block_generator)
 
-        cost_m = evaluate_cost(loss_m, method, k, block_generator)
-        cost_M = evaluate_cost(loss_M, method, k, block_generator)
-        if (cost_m, cost_M) in costs:
-            break
-        else:
-            costs.append((cost_m, cost_M))
+        beta_history.append([np.copy(beta_m), np.copy(beta_M)])
+        cost_history.append([
+            np.mean(loss_m[get_active_indexes(k, loss_m, method, block_generator)]),
+            np.mean(loss_M[get_active_indexes(k, loss_M, method, block_generator)])
+        ])
 
-        if cost_m < cost_hat:
-            beta_hat = np.copy(beta_m)
-            cost_hat = cost_m
-        if cost_M < cost_hat:
-            beta_hat = np.copy(beta_M)
-            cost_hat = cost_M
-
-    return beta_hat
+    return beta_history, cost_history

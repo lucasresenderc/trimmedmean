@@ -1,7 +1,62 @@
 import numpy as np
 
-from src.fit import fit_by_gd, fit_by_plugin, MOMBlockGenerator
+from src.fit import fit_by_aasd, fit_by_admm, fit_by_plugin, MOMBlockGenerator
 import src.configs as configs
+
+
+def get_beta_hat(betas, costs, beta_strategy):
+    if beta_strategy == "last":
+        return betas[-1][0]
+    elif beta_strategy == "best":
+        i,j = np.unravel_index(np.argmin(costs), (len(costs), 2))
+        return betas[i][j]
+
+
+def find_best_param(X, Y, histories, method, cv_strategy, beta_strategy, n_folds, fold_size):
+    param_losses = []
+    params = [p for p in histories]
+
+    for param in histories:
+        fold_losses = []
+        for fold in histories[param]:
+            # evaluate the loss
+            fold_indexes = histories[param][fold]["indexes"]
+            beta_hat = get_beta_hat(
+                histories[param][fold]["betas"],
+                histories[param][fold]["costs"],
+                beta_strategy
+            )
+            
+            # eval at fold
+            point_losses = (X[fold_indexes == 1] @ beta_hat - Y[fold_indexes == 1])**2
+            
+            # return the correct estimator
+            if method == "TM":
+                k_prime = int(param*fold_size)
+                if k_prime == 0:
+                    fold_losses.append(np.mean(point_losses))
+                else:
+                    fold_losses.append(np.mean(np.sort(point_losses)[k_prime:-k_prime]))
+            elif method == "MOM":
+                K_prime = int(param/n_folds)
+                if K_prime < 1:
+                    K_prime = 1
+                fold_losses.append(np.median([
+                    np.mean(point_losses[int(fold_size/K_prime*i):int(fold_size/K_prime*(i+1))]) for i in range(K_prime)
+                ]))  
+        param_losses.append(np.median(fold_losses))
+
+    # select best param
+    param_losses = np.array(param_losses)
+    if cv_strategy == "min_loss":
+        best_param = params[np.argmin(param_losses)]
+    elif cv_strategy == "max_slope":
+        best_param = params[np.argmax(param_losses[:-1] / param_losses[1:]) + 1]
+        if param_losses[0] < param_losses[-1]:
+            best_param = params[0]
+    
+    return best_param
+                
 
 def cross_validate(
     X,
@@ -14,8 +69,6 @@ def cross_validate(
     params: list = [],
     algorithm: str = configs.DEFAULT_ALGORITHM,
     block_kind = configs.DEFAULT_BLOCK_KIND,
-    selection_strategy = configs.DEFAULT_SELECTION_STRATEGY,
-    fold_K = configs.DEFAULT_FOLD_K,
 ):
     n = X.shape[0]
     fold_size = n//n_folds
@@ -26,72 +79,60 @@ def cross_validate(
     Y = Y[new_order]
 
     # set fit method
-    if algorithm == "gd":
-        fit = fit_by_gd
-    else:
+    if algorithm == "aasd":
+        fit = fit_by_aasd
+    elif algorithm == "admm":
+        fit = fit_by_admm
+    elif algorithm == "plugin":
         fit = fit_by_plugin
     
-    params_losses = []
+    histories = {}
     for param in params:
-        block_generator = None
         if method == "MOM":
             k = param
             block_generator = MOMBlockGenerator(block_kind, rng, n - fold_size, k)
         elif method == "TM":
             k = int(param*(n-fold_size))
+            block_generator = None
 
-        fold_losses = []
+        histories[param] = {}
         for fold in range(n_folds):
+            histories[param][fold] = {}
+
             # get fold indexes
             fold_indexes = np.zeros(n)
             fold_indexes[fold*fold_size:(fold+1)*fold_size] += 1
 
             # fit on complementary of the fold
-            beta_hat = fit(
+            beta_history, cost_history = fit(
                 X[fold_indexes == 0], 
                 Y[fold_indexes == 0],
                 beta_m, beta_M, k, block_generator = block_generator, method = method
             )
+            histories[param][fold]["indexes"] = fold_indexes
+            histories[param][fold]["betas"] = beta_history
+            histories[param][fold]["costs"] = cost_history
+    
+    returns = []
+    for cv_strategy in ["min_loss", "max_slope"]:
+        for beta_strategy in ["best", "last"]:
+            best_param = find_best_param(
+                X, Y, histories, method, cv_strategy, beta_strategy, n_folds, fold_size
+            ) 
 
-            # eval at fold
-            point_losses = (X[fold_indexes == 1] @ beta_hat - Y[fold_indexes == 1])**2
-            
-            # return the correct estimator
+            # fit all data using the best param
             if method == "TM":
-                k_prime = int(param*fold_size)
-                if k_prime == 0:
-                    fold_losses.append(np.mean(point_losses))
-                else:
-                    fold_losses.append(np.mean(np.sort(point_losses)[k_prime:-k_prime]))
+                betas, costs = fit(X,Y, beta_m, beta_M, int(best_param*n), block_generator = None, method = method)
             elif method == "MOM":
-                # Lerasle and Lecue used K' = max(grid_K)/V
-                if fold_K == "maxK/V":
-                    K_prime = int(np.max(params)/n_folds)
-                elif fold_K == "K/V":
-                    K_prime = int(k/n_folds)
-                if K_prime < 1:
-                    K_prime = 1
-                fold_losses.append(np.median([
-                    np.mean(point_losses[int(fold_size/K_prime*i):int(fold_size/K_prime*(i+1))]) for i in range(K_prime)
-                ]))
-            
-        params_losses.append(np.median(fold_losses))
-    
-    # select best param
-    params_losses = np.array(params_losses)
-    if selection_strategy == "min_loss":
-        best_param = params[np.argmin(params_losses)]
-    elif selection_strategy == "max_slope":
-        best_param = params[np.argmax(params_losses[:-1] / params_losses[1:]) + 1]
-        if params_losses[0] < params_losses[-1]:
-            best_param = params[0]
+                block_generator = MOMBlockGenerator(block_kind, rng, n, best_param)
+                betas, costs = fit(X,Y, beta_m, beta_M, best_param, block_generator = block_generator, method = method)
 
-    # fit all data using the best param
-    if method == "TM":
-        beta_hat = fit(X,Y, beta_m, beta_M, int(best_param*n), block_generator = None, method = method)
-    elif method == "MOM":
-        block_generator = MOMBlockGenerator(block_kind, rng, n, best_param)
-        beta_hat = fit(X,Y, beta_m, beta_M, best_param, block_generator = block_generator, method = method)
+            returns.append({
+                "cv_strategy": cv_strategy,
+                "beta_strategy": beta_strategy,
+                "beta_hat": get_beta_hat(betas, costs, beta_strategy),
+                "best_param": best_param
+            })
     
-    return beta_hat, params_losses, best_param
+    return returns
     

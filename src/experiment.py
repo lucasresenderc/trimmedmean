@@ -18,18 +18,21 @@ def run_single_trial(
     params: list = [],
     block_kind: str = configs.DEFAULT_BLOCK_KIND,
     algorithm: str = configs.DEFAULT_ALGORITHM,
-    selection_strategy = configs.DEFAULT_SELECTION_STRATEGY,
-    fold_K = configs.DEFAULT_FOLD_K,
 ):
     X, Y = generate_dataset(rng, beta, data_parameters=data_parameters)
     ts = time.time()
-    beta_m = rng.uniform(size=beta.size)
-    beta_M = rng.uniform(size=beta.size)
+    beta_hat = fit_by_lstsq(X, Y)[0][0][0]
+    beta_m = beta_hat * rng.uniform(size=beta.size)
+    beta_M = beta_hat * rng.uniform(size=beta.size)
     if method == "OLS":
-        beta_hat = fit_by_lstsq(X, Y)
-        return beta_hat, np.array([]), None, time.time() - ts
+        return [
+            {"cv_strategy": "min_loss", "beta_strategy": "best", "best_param": "-", "beta_hat": beta_hat},
+            {"cv_strategy": "max_slope", "beta_strategy": "best", "best_param": "-", "beta_hat": beta_hat},
+            {"cv_strategy": "min_loss", "beta_strategy": "last", "best_param": "-", "beta_hat": beta_hat},
+            {"cv_strategy": "max_slope", "beta_strategy": "last", "best_param": "-", "beta_hat": beta_hat}
+        ], time.time() - ts
     else:
-        beta_hat, params_losses, best_param = cross_validate(
+        strategies_results = cross_validate(
             X,
             Y,
             beta_m,
@@ -40,10 +43,8 @@ def run_single_trial(
             params = params,
             block_kind = block_kind,
             algorithm = algorithm,
-            selection_strategy = selection_strategy,
-            fold_K = fold_K,
         )
-        return beta_hat, params_losses, best_param, time.time() - ts
+        return strategies_results, time.time() - ts
 
 
 def run_trials(
@@ -53,8 +54,6 @@ def run_trials(
     params: list = [],
     block_kind: str = configs.DEFAULT_BLOCK_KIND,
     algorithm: str = configs.DEFAULT_ALGORITHM,
-    selection_strategy = configs.DEFAULT_SELECTION_STRATEGY,
-    fold_K = configs.DEFAULT_FOLD_K,
     n_trials: int = configs.DEFAULT_N_TRIALS,
     n_jobs: int = configs.DEFAULT_N_JOBS,
     start_random_seed: int = configs.DEFAULT_START_RANDOM_SEED,
@@ -71,25 +70,24 @@ def run_trials(
                 repeat(params),
                 repeat(block_kind),
                 repeat(algorithm),
-                repeat(selection_strategy),
-                repeat(fold_K),
             ),
         )
 
         df = []
-        for i, (beta_hat, params_losses, best_param, time) in enumerate(results):
-            df.append({
-                "seed": i + start_random_seed,
-                "method": method,
-                "params": params,
-                "params_losses": params_losses.tolist(),
-                "beta_hat": beta_hat.tolist(),
-                "L2_dist": np.linalg.norm(beta - beta_hat),
-                "best_param": best_param,
-                "block_kind": block_kind,
-                "algorithm": algorithm,
-                "selection_strategy": selection_strategy,
-                "fold_K": fold_K,
-                "time": time
-            } | data_parameters)
+        for i, (strategies_results, time) in enumerate(results):
+            for strategy_results in strategies_results:
+                beta_hat = strategy_results["beta_hat"]
+                df.append({
+                    "seed": i + start_random_seed,
+                    "method": method,
+                    "params": params,
+                    "beta_hat": beta_hat.tolist(),
+                    "L2_dist": np.linalg.norm(beta - beta_hat),
+                    "best_param": strategy_results["best_param"],
+                    "block_kind": block_kind,
+                    "algorithm": algorithm,
+                    "cv_strategy": strategy_results["cv_strategy"],
+                    "beta_strategy": strategy_results["beta_strategy"],
+                    "time": time
+                } | data_parameters)
         return df
