@@ -9,6 +9,8 @@ from src.cross_validation import cross_validate
 from src.fit import fit_by_lstsq
 import src.configs as configs
 
+from sklearn.linear_model import QuantileRegressor
+
 
 def run_single_trial(
     rng: np.random._generator.Generator,
@@ -21,10 +23,15 @@ def run_single_trial(
 ):
     X, Y = generate_dataset(rng, beta, data_parameters=data_parameters)
     ts = time.time()
-    beta_hat = fit_by_lstsq(X, Y)[0][0][0]
-    beta_m = beta_hat * rng.uniform(size=beta.size)
-    beta_M = beta_hat * rng.uniform(size=beta.size)
-    if method == "OLS":
+
+    if method == "QUANTILE":
+        beta_hat = QuantileRegressor(quantile = .5, fit_intercept = False, solver="highs", alpha=0).fit(X, Y).coef_
+    else:
+        beta_hat = fit_by_lstsq(X, Y)[0][0][0]
+        beta_m = beta_hat * rng.uniform(size=beta.size)
+        beta_M = beta_hat * rng.uniform(size=beta.size)
+    
+    if method in ["OLS", "QUANTILE"]:
         return [
             {"cv_strategy": "min_loss", "beta_strategy": "best", "best_param": "-", "beta_hat": beta_hat},
             {"cv_strategy": "max_slope", "beta_strategy": "best", "best_param": "-", "beta_hat": beta_hat},
@@ -77,7 +84,7 @@ def run_trials(
         for i, (strategies_results, time) in enumerate(results):
             for strategy_results in strategies_results:
                 beta_hat = strategy_results["beta_hat"]
-                df.append({
+                df.append({**{
                     "seed": i + start_random_seed,
                     "method": method,
                     "params": params,
@@ -89,5 +96,5 @@ def run_trials(
                     "cv_strategy": strategy_results["cv_strategy"],
                     "beta_strategy": strategy_results["beta_strategy"],
                     "time": time
-                } | data_parameters)
+                } , **data_parameters})
         return df

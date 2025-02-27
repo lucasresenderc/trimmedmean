@@ -1,9 +1,13 @@
+# import numpy as np
+# from scipy.stats import norm, t
+# from scipy.integrate import quad
+
 DEFAULT_DATA_PARAMETERS = {
-    "type": "NormalContaminated",
+    "type": "SkeSGD",
     "sample_size": 1000,
     "sample_contaminated": 200,
-    "error_type": 0, #0 = Normal, > 0 is the df of students
-    "skew": False,
+    "alpha": "inf", # inf = normal, n/2 = st with n df, 1/2 is cauchy
+    "skew": 0,
     "heteroscedasticity": False,
 }
 

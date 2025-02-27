@@ -9,6 +9,7 @@
 import numpy as np
 
 import src.configs as configs 
+from src.distributions import SkeGTD
 
 
 def generate_dataset(
@@ -16,20 +17,23 @@ def generate_dataset(
     beta: np.ndarray,
     data_parameters: dict = configs.DEFAULT_DATA_PARAMETERS,
 ):
-    if data_parameters["type"] == "NormalContaminated":
+    if data_parameters["type"] == "SkeGTD":
         n = data_parameters["sample_size"]
         nc = data_parameters["sample_contaminated"]
-        df = data_parameters["error_type"]
+        alpha = data_parameters["alpha"]
+        skew = data_parameters["skew"]
         d = beta.size
+
+        if alpha == "inf":
+            alpha = np.inf
 
         X = rng.normal(size=(n, d))
 
-        if df:
-            xi = rng.standard_t(df, size=n)
-        else:
-            xi = rng.normal(size=n)
-        if data_parameters["skew"]:
-            xi = (xi > 1)*np.log(np.abs(xi)) + (xi <= 1)*(xi-1)
+        dist = SkeGTD(alpha, skew, rng)
+        xi = dist.rvs(shape=n)
+        if alpha > .5:
+            xi -= dist.mean()
+
         if data_parameters["heteroscedasticity"]:
             xi = xi * np.exp(np.sum(X**2, axis=1)/(2*d))
 

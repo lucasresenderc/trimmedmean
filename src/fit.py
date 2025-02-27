@@ -14,10 +14,12 @@
     update_by_armijo: update the objetive using the armijo rule
     fit_by_gd: fits data using the gradient descent algorithm
     fit_by_plugin: fits data using the plugin method
+    fit_quantile: fits a quantile regressor method
 
 """
 
 import numpy as np
+from sklearn.linear_model import QuantileRegressor, HuberRegressor
 
 import src.configs as configs
 
@@ -200,3 +202,12 @@ def fit_by_plugin(
         ])
 
     return beta_history, cost_history
+
+
+def fit_huber(
+    X,
+    Y,
+    epsilon: float
+):
+    huber = HuberRegressor(epsilon = epsilon, fit_intercept = False, alpha=0).fit(X, Y)
+    return huber.coef_, huber.scale_

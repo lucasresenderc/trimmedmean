@@ -8,7 +8,7 @@ All code required to perform robust regression and cross-validation is available
 
 To run the experiments simply execute the <code> run_experiments.py </code> file (it may take several hours to finish).
 
-The images appearing in the article and some more insights can be obtained running the notebook <code>Figures.ipynb</code>.
+The images and tables appearing in the article and some more insights can be obtained running the notebook <code>Results.ipynb</code>.
 
 ## What if I want to use it to fit some data of my own?
 
